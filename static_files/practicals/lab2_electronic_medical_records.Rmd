@@ -61,7 +61,7 @@ filtered.data <- raw.data %>% dplyr::filter(medical_specialty %in% c("Neurology"
 
 Let's now apply our standard pre-processing to the transcripts from these specialties.  
 We are going to use the `tidytext` package to tokenise the transcript free-text.  
-Let's remove stop words first
+Let's remove stop words first. e.g., "the", "of", "to", and so forth.  These are known as stop words and we can remove them relative easily using a list from  `tidytext::stop_words` and `dplyr::anti_join()`
 
 ```{r}
 analysis.data <- filtered.data %>%
@@ -71,26 +71,57 @@ analysis.data <- filtered.data %>%
     summarise(transcription = paste(word, collapse = " ")) %>%
     left_join(select(analysis.data, -transcription), by="note_id")
 ```
-Now let's tokenize the `transcription` to words (unigram) 
-By default this tokenises to words but other options include characters, n-grams, sentences, lines, paragraphs, or separation around a regular expression.
-
-```{r}
-tokenized.data <- analysis.data %>% tidytext::unnest_tokens(word, transcription, to_lower=TRUE)
-```
-
-How many unique tokens are there in the transcripts from each specialty:
-
-```{r}
-tokenized.data %>% dplyr::group_by(medical_specialty) %>% dplyr::distinct(word) %>% dplyr::summarise(n=dplyr::n())
-```
-
-However, there are a lot of extremely common words e.g., "the", "of", "to", and so forth.  
-These are known as stop words and we can remove them relative easily using a list from  `tidytext::stop_words` and `dplyr::anti_join()`
-
 **2** How many stop words are there in `tidytext::stop_words`?
 
 ```{r}
 no.stop.tokenized.data <- tokenized.data %>% dplyr::anti_join(tidytext::stop_words) 
+```
+
+Now let's tokenize the `transcription` to words (unigram) 
+By default this tokenises to words but other options include characters, n-grams, sentences, lines, paragraphs, or separation around a regular expression.
+
+```{r}
+tokenized.data.unigram <- analysis.data %>% tidytext::unnest_tokens(word, transcription, to_lower=TRUE)
+```
+
+You can also do bi-grams
+```{r}
+tokenized.data <- analysis.data.sw.removed %>% tidytext::unnest_tokens(ngram, transcription, token = "ngrams", n=2, to_lower = TRUE)
+```
+
+
+How many unique tokens are there in the transcripts from each specialty:
+
+```{r}
+tokenized.data.unigram %>% dplyr::group_by(medical_specialty) %>% dplyr::distinct(word) %>% dplyr::summarise(n=dplyr::n())
+
+```
+For bigram
+
+```{r}
+tokenized.data2 %>% dplyr::group_by(medical_specialty) %>% dplyr::distinct(ngram) %>% dplyr::summarise(n=dplyr::n())
+```
+
+Let's plot some distribution of words
+
+
+```{r}
+word_counts <- tokenized.data %>%
+    group_by(word) %>%
+    summarise(count = n()) %>%
+    ungroup() %>%
+    arrange(desc(count))
+
+count_distribution <- word_counts %>%
+  group_by(count) %>%
+  summarise(num_words = n()) %>%
+  ungroup()
+ 
+ ggplot2::ggplot(count_distribution, aes(x = count, y = num_words)) +
+  geom_point() +
+  labs(title = "Scatter Plot of Count Distribution",
+       x = "Count of Unique Words",
+       y = "Number of Words")
 ```
 
 **3** How many unique words are there in each category without stop words and numbers?
