@@ -48,7 +48,7 @@ So, how many transcripts are there from each specialty:
 
 
 ```{r}
-ggplot2::ggplot(raw.data, ggplot2::aes(y=medical_specialty)) + ggplot2::geom_bar()
+ggplot2::ggplot(raw.data, ggplot2::aes(y=medical_specialty)) + ggplot2::geom_bar() + labs(x="Document Count", y="Medical Speciality")
 ```
 
 Let's make our life easier and filter down to 3 specialties: a diagonstic/lab, a medical, and a surgical specialty
