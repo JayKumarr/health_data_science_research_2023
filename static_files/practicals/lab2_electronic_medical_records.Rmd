@@ -54,13 +54,24 @@ ggplot2::ggplot(raw.data, ggplot2::aes(y=medical_specialty)) + ggplot2::geom_bar
 Let's make our life easier and filter down to 3 specialties: a diagonstic/lab, a medical, and a surgical specialty
 
 ```{r} 
-analysis.data <- raw.data %>% dplyr::filter(medical_specialty %in% c("Neurology", "Radiology", "Neurosurgery")) 
+filtered.data <- raw.data %>% dplyr::filter(medical_specialty %in% c("Neurology", "Radiology", "Neurosurgery")) 
 ```
 
 ## Text Processing
 
 Let's now apply our standard pre-processing to the transcripts from these specialties.  
 We are going to use the `tidytext` package to tokenise the transcript free-text.  
+Let's remove stop words first
+
+```{r}
+analysis.data <- filtered.data %>%
+    unnest_tokens(word, transcription) %>%
+    anti_join(stop_words) %>%
+    group_by(note_id) %>%
+    summarise(transcription = paste(word, collapse = " ")) %>%
+    left_join(select(analysis.data, -transcription), by="note_id")
+```
+
 By default this tokenises to words but other options include characters, n-grams, sentences, lines, paragraphs, or separation around a regular expression.
 
 ```{r}
