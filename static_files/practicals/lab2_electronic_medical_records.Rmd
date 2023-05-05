@@ -16,11 +16,13 @@ library(tidytext)
 library(textstem)
 library(clinspacy)
 library(topicmodels)
+library('reshape2')
+
 ```
 
 This practical is based on exploratory data analysis, named entity recognition, and topic modelling of unstructured medical note free-text data derived from electronic medical records (EMR).  Real EMR data is very difficult to access without a specific need/request so this data set is derived from [medical transcription](https://mtsamples.com/) data instead.  I'll also caveat that the options of natural language processing (NLP) in R are far inferior to those available in Python. 
 
-First, install the packages in the setup block (`install.packages(c("readr", "dplyr", "tidyr", "ggplot2", "tidtext", "textstem", "clinspacy", "topicmodels"))`).
+First, install the packages in the setup block (`install.packages(c("readr", "dplyr", "tidyr", "ggplot2", "tidtext", "textstem", "clinspacy", "topicmodels", "reshape2"))`).
 
 Note: To try and make it clearer which library certain functions are coming from clearer, I'll try to do explicit imports throughout this notebook.
 
@@ -69,13 +71,9 @@ analysis.data <- filtered.data %>%
     anti_join(stop_words) %>%
     group_by(note_id) %>%
     summarise(transcription = paste(word, collapse = " ")) %>%
-    left_join(select(analysis.data, -transcription), by="note_id")
+    left_join(select(filtered.data, -transcription), by="note_id")
 ```
-**2** How many stop words are there in `tidytext::stop_words`?
 
-```{r}
-no.stop.tokenized.data <- tokenized.data %>% dplyr::anti_join(tidytext::stop_words) 
-```
 
 Now let's tokenize the `transcription` to words (unigram) 
 By default this tokenises to words but other options include characters, n-grams, sentences, lines, paragraphs, or separation around a regular expression.
@@ -86,11 +84,11 @@ tokenized.data.unigram <- analysis.data %>% tidytext::unnest_tokens(word, transc
 
 You can also do bi-grams
 ```{r}
-tokenized.data <- analysis.data.sw.removed %>% tidytext::unnest_tokens(ngram, transcription, token = "ngrams", n=2, to_lower = TRUE)
+tokenized.data <- analysis.data %>% tidytext::unnest_tokens(ngram, transcription, token = "ngrams", n=2, to_lower = TRUE)
 ```
 
 
-How many unique tokens are there in the transcripts from each specialty:
+**2** How many unique tokens are there in the transcripts from each specialty:
 
 ```{r}
 tokenized.data.unigram %>% dplyr::group_by(medical_specialty) %>% dplyr::distinct(word) %>% dplyr::summarise(n=dplyr::n())
@@ -99,14 +97,14 @@ tokenized.data.unigram %>% dplyr::group_by(medical_specialty) %>% dplyr::distinc
 For bigram
 
 ```{r}
-tokenized.data2 %>% dplyr::group_by(medical_specialty) %>% dplyr::distinct(ngram) %>% dplyr::summarise(n=dplyr::n())
+tokenized.data %>% dplyr::group_by(medical_specialty) %>% dplyr::distinct(ngram) %>% dplyr::summarise(n=dplyr::n())
 ```
 
-Let's plot some distribution of words
+Let's plot some distribution of unigram tokens (words)
 
 
 ```{r}
-word_counts <- tokenized.data %>%
+word_counts <- tokenized.data.unigram %>%
     group_by(word) %>%
     summarise(count = n()) %>%
     ungroup() %>%
@@ -124,6 +122,29 @@ count_distribution <- word_counts %>%
        y = "Number of Words")
 ```
 
+
+Let's plot some distribution of bigram tokens (words)
+
+
+```{r}
+word_counts <- tokenized.data %>%
+    group_by(ngram) %>%
+    summarise(count = n()) %>%
+    ungroup() %>%
+    arrange(desc(count))
+
+count_distribution <- word_counts %>%
+  group_by(count) %>%
+  summarise(num_words = n()) %>%
+  ungroup()
+ 
+ ggplot2::ggplot(count_distribution, aes(x = count, y = num_words)) +
+  geom_point() +
+  labs(title = "Scatter Plot of Count Distribution",
+       x = "Count of Unique Bigrams",
+       y = "Number of Words")
+```
+
 **3** How many unique words are there in each category without stop words and numbers?
 
 Sometimes we are interested in tokenising/segmenting things other than words like whole sentences or paragraphs.  
@@ -132,9 +153,9 @@ Sometimes we are interested in tokenising/segmenting things other than words lik
 Now that we've tokenized to words and removed stop words, we can find the most commonly word used within each category:
 
 ```{r}
-no.stop.tokenized.data %>%
+tokenized.data %>%
   dplyr::group_by(medical_specialty) %>%
-  dplyr::count(word, sort = TRUE) %>%
+  dplyr::count(ngram, sort = TRUE) %>%
   dplyr::top_n(5)
 ```
 
@@ -146,7 +167,7 @@ Annoyingly, `tidytext` doesn't have a built-in lemmatizer.
 Unfortunately, a specialised lemmatizer like in `clinspacy` is going to be very painful to install so we will just use a simple lemmatizer for now:
 
 ```{r}
-lemmatized.data <- no.stop.tokenized.data %>% dplyr::mutate(lemma=textstem::lemmatize_words(word))
+lemmatized.data <- tokenized.data %>% dplyr::mutate(lemma=textstem::lemmatize_words(ngram))
 ```
 
 We can now calculate the frequency of lemmas within each specialty and note.
